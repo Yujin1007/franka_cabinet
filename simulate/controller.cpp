@@ -16,6 +16,14 @@
 // #include <torch/torch.h>
 // #include <torch/script.h>
 
+const string RED = "\033[31m";
+const string GREEN = "\033[32m";
+const string YELLOW = "\033[33m";
+const string BLUE = "\033[34m";
+const string MAGENTA = "\033[35m";
+const string CYAN = "\033[36m";
+const string RESET = "\033[0m";
+
 CController::CController(int JDOF)
 {
 	_k = JDOF;
@@ -43,8 +51,8 @@ void CController::read_pybind(double t, array<double, 11> q, array<double, 11> q
 		_bool_init = false;
 	}
 
-	_dt = t - _pre_t;
-	_pre_t = t;
+	// _dt = t - _pre_t;
+	// _pre_t = t;
 
 	for (int i = 0; i < _k; i++)
 	{
@@ -400,6 +408,12 @@ void CController::control_mujoco()
 		_x_des_hand.segment<3>(3) = CustomMath::GetBodyRotationAngle(_R_des_hand);
 		_xdot_des_hand.segment<3>(3) = rotationdot_circular(_R_des_hand, _R_hand);
 		_force_gain += _dforce_gain;
+
+		if (_force_gain < 0.0)
+		{
+			_force_gain = 0.0;
+		}
+
 		// CLIK();
 		// OperationalSpaceControl();
 		// _force_gain += 0.01;
@@ -422,213 +436,13 @@ void CController::control_mujoco()
 		}
 	}
 	
-	
-	// else if (_control_mode == 3) // open latch
-	// {
-	// 	// cout<<"333333333333333333333333333333333333333333333333333333"<<endl;
-	// 	if (_t - _init_t < 0.1 && _bool_ee_motion == false)
-	// 	{
-	// 		_start_time = _init_t;
-	// 		_end_time = _start_time + _motion_time;
-	// 		CircularTrajectory.reset_initial(_start_time, _grab_vector, _normal_vector, _obj.origin, _radius, _Tvr, _dt);
-	// 		CircularTrajectory.update_goal(_end_time, _init_theta, _goal_theta, _x_hand.head(3), 0); // _init_theta = 0 -> change to learned result later
-	// 		_bool_ee_motion = true;
-	// 		_x_des_hand = _x_hand;
-
-	// 		_q_des = _q;
-	// 		_xdot_des_hand = _xdot_hand;
-	// 		_qdot_des = _qdot;
-	// 		_theta_des = _init_theta;
-	// 		_v2ef_vector = (_Ruv * (_x_hand.head(3) - _obj.origin)).normalized();
-	// 	}
-	// 	// _theta_des = CircularTrajectory.update_time(_t);
-	// 	_v2ei_vector = _v2ef_vector;
-	// 	_v2ef_vector = (_Ruv * (_x_hand.head(3) - _obj.origin)).normalized();
-	// 	_dtheta = CustomMath::signedAngleBetweenVectors(_v2ei_vector, _v2ef_vector);
-	// 	_theta_des = _theta_des + _dtheta;
-	// 	CircularTrajectory.update_theta(_theta_des);
-
-	// 	_x_des_hand.tail(3) = CircularTrajectory.rotation_circular(_pitch, _roll, _x_hand.head(3));
-	// 	// cout<<"_pitch :"<< _pitch <<"  _roll"<<_roll<<endl;
-
-	// 	_xdot_des_hand.tail(3) = CircularTrajectory.rotationdot_circular();
-	// 	_R_des_hand = CustomMath::GetBodyRotationMatrix(_x_des_hand(3), _x_des_hand(4), _x_des_hand(5));
-	// 	// _theta_des = CircularTrajectory.update_time(_t);
-	// 	_x_des_hand.head(3) = CircularTrajectory.position_circular();
-	// 	_xdot_des_hand.head(3) = CircularTrajectory.velocity_circular();
-
-	// 	// OperationalSpaceControl();
-	// 	// if (abs(_q_latch) > DEG2RAD * 88)
-	// 	// {
-	// 	// 	_dforce_gain = -0.1;
-	// 	// 	_force_gain += _dforce_gain * 0.1;
-	// 	// }
-	// 	// else
-	// 	// {
-	// 	if (abs(_qdot_latch) < abs(0.7))
-	// 	{
-	// 		// _force_gain += 0.01;
-	// 		// _force_gain += 10 * (_t - _start_time);
-	// 		// _dforce_gain = action_force*0.1;
-	// 		_dforce_gain = 1;
-	// 		_force_gain += _dforce_gain * 0.1;
-	// 	}
-	// 	else if (abs(_qdot_latch) > abs(0.78))
-	// 	{
-	// 		// _force_gain -= 0.1;
-	// 		_dforce_gain = -1;
-	// 		_force_gain += _dforce_gain * 0.1;
-	// 		// cout << "decrease :" << _qdot_latch;
-	// 	}
-	// 	else
-	// 	{
-	// 		_dforce_gain = 0.0;
-	// 		_force_gain += _dforce_gain * 0.1;
-	// 	}
-
-	// 	// }
-	// 	if (_force_gain < 0.0)
-	// 	{
-	// 		_force_gain = 0.0;
-	// 	}
-	// 	// cout << "_force gain:" << _force_gain;
-	// 	// cout << "_qdot lath:" << _qdot_latch;
-	// 	// cout << "_q latch:" << _q_latch << endl;
-	// 	VectorXd min_q(7), max_q(7), scaled_q(7);
-	// 	min_q << -2.7437, -1.7837, -2.9007, -3.0421, -2.8065, 0.5445, -3.0159;
-	// 	max_q << 2.7437, 1.7837, 2.9007, -0.1518, 2.8065, 4.5169, 3.0159;
-	// 	scaled_q << ((_q - min_q).cwiseQuotient(max_q - min_q) * (1 - (-1))).array() - 1;
-
-	// 	// if (scaled_q.cwiseAbs().maxCoeff() > 0.92)
-	// 	// {
-	// 	// 	_dforce_gain = -10;
-	// 	// 	_force_gain += _dforce_gain * 0.1;
-	// 	// }
-	// 	HybridControl();
-	// 	// CLIK();
-	// 	GripperControl();
-	// 	if (abs(_q_latch) > abs(_goal_theta))
-	// 	{
-	// 		_bool_plan(_cnt_plan) = 1;
-	// 		_bool_init = true;
-	// 		_force_gain = 0.0;
-	// 	}
-
-	// 	// if (CircularTrajectory.check_trajectory_complete() == 1)
-	// 	// {
-	// 	// 	_bool_plan(_cnt_plan) = 1;
-	// 	// 	_bool_init = true;
-	// 	// 	_force_gain = 0.0;
-	// 	// }
-	// }
-	// else if (_control_mode == 4) // open door
-	// {
-	// 	// cout<<"444444444444444444444444444444444444444444444444444444"<<endl;
-	// 	if (_t - _init_t < 0.1 && _bool_ee_motion == false)
-	// 	{
-	// 		_start_time = _init_t;
-	// 		_end_time = _start_time + _motion_time;
-	// 		CircularTrajectory.reset_initial(_start_time, _grab_vector, _normal_vector, _obj.origin, sqrt(pow(_radius, 2) + pow(0.15, 2)), _Tvr, _dt);
-	// 		CircularTrajectory.update_goal(_end_time, _init_theta, _goal_theta, _x_hand.head(3), 0); // _init_theta = 0 -> change to learned result later
-	// 		CircularTrajectory2.reset_initial(_start_time, -_grab_vector, -_normal_vector, _obj.origin, sqrt(pow(_radius, 2) + pow(0.15, 2)), _Tvr, _dt);
-	// 		CircularTrajectory2.update_goal(_end_time, M_PI_2, _goal_theta, _x_hand.head(3), 1); // _init_theta = 0 -> change to learned result later
-
-	// 		_bool_ee_motion = true;
-	// 		_x_des_hand = _x_hand;
-
-	// 		_q_des = _q;
-	// 		_xdot_des_hand = _xdot_hand;
-	// 		_qdot_des = _qdot;
-	// 		_theta_des = M_PI_2;
-	// 		// _theta_latch = _init_theta;
-	// 		Vector3d dx(3);
-	// 		dx << _x_hand.head(3) - _obj.origin;
-	// 		dx(2) = 0.0;
-	// 		_v2ei_vector = _v2ef_vector;
-
-	// 		_v2ef_vector = (_Ruv * (dx)).normalized();
-	// 		_x_tmp << _x_hand;
-	// 		_pitch = 0;
-	// 		_roll = 0;
-	// 	}
-
-	// 	if (_planning_mode == 1)
-	// 	{
-	// 		_force_gain += _dforce_gain;
-	// 	}
-	// 	else if (_planning_mode == 0)
-	// 	{
-			
-	// 		_pitch = 0.0;
-	// 		_roll = 0.0;
-	// 		if (abs(_qdot_door) < abs(0.1) * 1)
-	// 		{
-	// 			_dforce_gain = 1;
-	// 			_force_gain += _dforce_gain * 0.1;
-	// 		}
-	// 		else if (abs(_qdot_door) > abs(0.15) * 1)
-	// 		{
-	// 			_dforce_gain = -1;
-	// 			_force_gain += _dforce_gain * 0.1;
-	// 		}
-	// 		else
-	// 		{
-	// 			_dforce_gain = 0.0;
-	// 			_force_gain += _dforce_gain * 0.1;
-	// 		}
-	// 		// cout<<"_Force gain:"<<_force_gain<<"  ";
-	// 		// VectorXd min_q(7), max_q(7), scaled_q(7);
-	// 		// min_q << -2.7437, -1.7837, -2.9007, -3.0421, -2.8065, 0.5445, -3.0159;
-	// 		// max_q << 2.7437, 1.7837, 2.9007, -0.1518, 2.8065, 4.5169, 3.0159;
-	// 		// scaled_q << ((_q - min_q).cwiseQuotient(max_q - min_q) * (1 - (-1))).array() - 1;
-	// 		// if (scaled_q.cwiseAbs().maxCoeff() > 0.92)
-	// 		// {
-	// 		// 	_dforce_gain = -10;
-	// 		// 	_force_gain += _dforce_gain * 0.1;
-	// 		// }
-	// 	}
-	// 	// _theta_des = CircularTrajectory.update_time(_t);
-	// 	Vector3d dx(3);
-	// 	dx << _x_hand.head(3) - _obj.origin;
-	// 	dx(2) = 0.0;
-	// 	_v2ei_vector = _v2ef_vector;
-
-	// 	_v2ef_vector = (_Ruv * (dx)).normalized();
-
-	// 	_dtheta = CustomMath::signedAngleBetweenVectors(_v2ei_vector, _v2ef_vector);
-	// 	_theta_des = _theta_des + _dtheta;
-
-	// 	CircularTrajectory2.update_theta(_theta_des);
-	// 	_x_des_hand.tail(3) = CircularTrajectory2.rotation_circular(_pitch, _roll, _x_hand.head(3));
-	// 	_xdot_des_hand.tail(3) = CircularTrajectory2.rotationdot_circular();
-	// 	_R_des_hand = CustomMath::GetBodyRotationMatrix(_x_des_hand(3), _x_des_hand(4), _x_des_hand(5));
-
-	// 	CircularTrajectory.update_theta(_init_theta + _dtheta);
-	// 	_x_des_hand.head(3) = CircularTrajectory.position_circular();
-	// 	_xdot_des_hand.head(3) = CircularTrajectory.velocity_circular();
-		
-		
-
-	// 	if (_force_gain < 0.0)
-	// 	{
-	// 		_force_gain = 0.0;
-	// 	}
-	// 	HybridControl();
-	// 	// OperationalSpaceControl();
-
-	// 	// CLIK();
-	// 	GripperControl();
-
-	// 	if (abs(_q_door) > abs(_goal_theta - _init_theta))
-	// 	{
-	// 		_bool_plan(_cnt_plan) = 1;
-	// 		_bool_init = true;
-	// 		_force_gain = 0.0;
-	// 	}
-	// }
-	
 	_q_pre = _q;
 	_qdot_pre = _qdot;
+}
+
+double CController::get_force_gain()
+{
+	return _force_gain;
 }
 
 void CController::ModelUpdate()
@@ -949,10 +763,9 @@ void CController::TargetPlan()
 	_reach_cabinet1.gripper = _gripper_close;
 	_reach_cabinet1.time = 1.0;
 	_target_plan.push_back(_reach_cabinet1);
-
 	
-	_reach_cabinet1.time = 4.0;
 	_reach_cabinet1.state = "open";
+	_reach_cabinet1.time = abs(motion_time_const * abs(_goal_theta_cabinet)) * 2;
 	_target_plan.push_back(_reach_cabinet1);
 
 
@@ -1252,7 +1065,7 @@ void CController::HybridControl()
 
 	else if ((target.state == "open"))
 	{
-
+		// cout << "HHHHHHHHHHHEEEEEEEEEEEEERRRRRRRRRRRRRRREEEEEEEEEEEEE" << endl;
 		_J_bar_hands = CustomMath::pseudoInverseQR(_J_hands);
 		_lambda = CustomMath::pseudoInverseQR((_Ruv_J * _J_hands).transpose()) * Model._A * CustomMath::pseudoInverseQR(_Ruv_J * _J_hands);
 
@@ -1328,6 +1141,10 @@ void CController::HybridControl()
 		FORCE << FORCEX + FORCEV;
 
 		_torque = _J_hands.transpose() * FORCE + Model._bg;
+
+		// cout << RED << "SelectionX: \n" << SelectionX << RESET << endl;
+		// cout << YELLOW << "_force: \n" << _force << RESET << endl;
+		// cout << "====================================" << endl;
 
 		// cout << "selected force :" << selected_force.transpose() << endl;
 		// cout << _Rvu_J << endl;
@@ -1573,7 +1390,7 @@ void CController::Initialize(int planning_mode, array<array<double, 4>, 4> latch
 	load_model();
 }
 
-void CController::Initialize_Cabinet(int planning_mode, array<array<double, 4>, 4> cabinet_info)
+void CController::Initialize_Cabinet(int planning_mode, array<array<double, 4>, 4> cabinet_info, double goal_theta)
 {
 
 	_control_mode = 1; // 1: joint space, 2: task space(CLIK)
@@ -1769,6 +1586,7 @@ void CController::Initialize_Cabinet(int planning_mode, array<array<double, 4>, 
 	// for cabinet
 	_position_cabinet.setZero(3);
 	_rotation_cabinet.setZero(3, 3);
+	_goal_theta_cabinet = goal_theta;
 
 	for (int i = 0; i < 3; ++i)
 	{
@@ -1813,7 +1631,9 @@ PYBIND11_MODULE(controller, m)
 		// .def("target_replan", &CController::TargetRePlan_pybind)
 		// .def("target_replan2", &CController::TargetRePlan2_pybind)
 		// .def("target_replan3", &CController::TargetRePlan3_pybind)
-		.def("get_action", &CController::get_actions_pybind);
+		.def("get_action", &CController::get_actions_pybind)
+		.def("get_force_gain", &CController::get_force_gain)
+		;
 		// .def("get_commands", &CController::get_commands_pybind);
 
 	//   .def("write", &CController::write);

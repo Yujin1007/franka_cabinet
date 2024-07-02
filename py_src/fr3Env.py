@@ -4,7 +4,7 @@ import time
 
 import pandas as pd
 
-sys.path.append('/home/kist-robot2/Franka/franka_cabinet')
+sys.path.append('/home/kist/franka_cabinet')
 import numpy as np
 import sys
 from numpy.linalg import inv
@@ -25,6 +25,13 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+MAGENTA = "\033[35m"
+CYAN = "\033[36m"
+RESET = "\033[0m"
 
 BODY = 1
 JOINT = 3
@@ -40,8 +47,8 @@ XYZRPY = True
 
 JOINT_CONTROL = 1
 TASK_CONTROL = 2
-HEURISTIC_CIRCULAR_CONTROL = 3
-RL_CIRCULAR_CONTROL = 4
+HEURISTIC_CIRCULAR_CONTROL = 2
+RL_CIRCULAR_CONTROL = 3
 RL_CONTROL = 6
 
 
@@ -1405,6 +1412,8 @@ class door_env:
         self.history_observation[1:] = self.history_observation[:-1]
         self.history_observation[0] = obs
         observation = self.generate_downsampled_observation(self.history_observation)
+        print("++++++++++++++++++++++++++++++++++++++++++++")
+        print("observation", observation)
         return observation
 
     def _reward(self, action_rotation, action_force):
@@ -1461,7 +1470,7 @@ class door_env:
         if self.control_mode != RL_CIRCULAR_CONTROL:
             self.deviation_done = False
         else:
-            if len(self.grasp_list) <= 2:
+            if len(self.grasp_list) <= 4:
                 self.deviation_done = True
 
         self.time_done = self.data.time - self.start_time >= self.episode_time
@@ -1825,43 +1834,45 @@ class cabinet_env:
         self.rotation_action_space, self.force_action_space = self._construct_action_space()
 
         self.viewer = None
-        self.q_range = self.model.jnt_range[:self.k]
+        self.q_range = self.model.jnt_range[:self.dof]
         self.qdot_range = np.array([[-2.1750, 2.1750], [-2.1750, 2.1750], [-2.1750, 2.1750], [-2.1750, 2.1750],
-                                    [-2.61, 2.61], [-2.61, 2.61], [-2.61, 2.61]])
-        self.tau_range = np.array([[0, 87], [0, 87], [0, 87], [0, 87], [0, 12], [0, 12], [0, 12]])
+                                    [-2.61, 2.61], [-2.61, 2.61], [-2.61, 2.61], [-2.61, 2.61], [-2.61, 2.61]])
+        self.tau_range = np.array([[0, 87], [0, 87], [0, 87], [0, 87], [0, 12], [0, 12], [0, 12], [0, 255]])
         self.qdot_init = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.q_init = [0, np.deg2rad(-60), 0, np.deg2rad(-90), 0, np.deg2rad(90), np.deg2rad(45), 0, 0, 0, 0]
         # self.q_init = [0, np.deg2rad(-45), 0, np.deg2rad(-135), 0, np.deg2rad(90), np.deg2rad(45), 0, 0, 0, 0]
         self.q_reset = [0, np.deg2rad(-60), 0, np.deg2rad(-90), 0, np.deg2rad(90), np.deg2rad(45), 0.03, 0.03, 0, 0]
         self.episode_number = -1
+        
         desired_contact_list = ["finger_contact0", "finger_contact1",
                                 "finger_contact2", "finger_contact3", "finger_contact4", "finger_contact5",
                                 "finger_contact6", "finger_contact7",
                                 "finger_contact8", "finger_contact9", "finger0_contact", "finger1_contact",
-                                "door_handle",]
+                                "cabinet321", "handle_marker1", "cabinet323"]
         desired_contact_list_finger = ["finger_contact0", "finger_contact1",
                                        "finger_contact2", "finger_contact3", "finger_contact4",
                                        "finger_contact5", "finger_contact6", "finger_contact7",
                                        "finger_contact8", "finger_contact9", ]
-        desired_contact_list_obj = ["door_handle"]
+        desired_contact_list_obj = ["cabinet321", "handle_marker1", "cabinet323"]
         self.desired_contact_bid = tools.name2id(self.model, GEOM, desired_contact_list)
         self.desired_contact_finger_bid = tools.name2id(self.model, GEOM, desired_contact_list_finger)
         self.desired_contact_obj_bid = tools.name2id(self.model, GEOM, desired_contact_list_obj)
 
         self.history_observation = np.zeros([self.len_hist * self.downsampling, self.observation_space.shape])
-        self.goal_latch_angle = -np.pi/2
-        self.latch_radius = 0.15
-        self.goal_door_angle = +np.pi/2
-        self.door_radius = 0.73 # 문고리 회전축~문 회전축까지
-        self.door_joint_idx = mujoco.mj_name2id(self.model, JOINT, "hinge")
-        self.latch_joint_idx = mujoco.mj_name2id(self.model, JOINT, "latch")
-        self.door_body_idx = mujoco.mj_name2id(self.model, BODY, "hinge_axis")
-        self.latch_body_idx = mujoco.mj_name2id(self.model, BODY, "latch_axis")
-        self.cabinet1_info, self.door_info = self.env_information()
+        
+        # cabinet
+        self.goal_cabinet_angle = 0.52 # prismatic joint
+
+        # cabinet
+        # self.cabinet1_body_idx
         
         ## for cabinet1
-        self.cabinet1_idx = mujoco.mj_name2id(self.model, GEOM, "cabinet320_handle") # 128
+        self.cabinet1_idx = mujoco.mj_name2id(self.model, GEOM, "handle_marker1") # 128
         self.cabinet1_joint_idx = mujoco.mj_name2id(self.model, JOINT, "base_cabinet_c3_r2_drawer_front_panel_joint")
+        
+        self.cabinet1_info = self.env_information()
+        
+        self.error_xpos = 0
 
 
     def reset(self, planning_mode):
@@ -1878,14 +1889,13 @@ class cabinet_env:
         self.start_time = self.data.time + 100
         
         # self.controller.initialize(planning_mode, self.latch_info, self.door_info, [self.goal_latch_angle, self.goal_door_angle])
-        self.controller.initialize_cabinet(planning_mode, self.cabinet1_info) # HEURISTIC: planning_mode = 0, RL: planning_mode = 1
+        self.controller.initialize_cabinet(planning_mode, self.cabinet1_info, self.goal_cabinet_angle) # HEURISTIC: planning_mode = 0, RL: planning_mode = 1
 
         self.data.qpos = self.q_init
         self.data.qvel = self.qdot_init
 
-        self.episode_time = abs( # 13.8
-            MOTION_TIME_CONST * abs(self.goal_door_angle) * self.door_radius) + abs(
-            MOTION_TIME_CONST * abs(self.goal_latch_angle) * self.latch_radius)
+        self.episode_time = abs( # 5.2
+            MOTION_TIME_CONST * abs(self.goal_cabinet_angle))
 
         self.controller.read(self.data.time, self.data.qpos, self.data.qvel, self.model.opt.timestep)
         self.controller.control_mujoco()
@@ -1900,8 +1910,7 @@ class cabinet_env:
         obs = self._observation()
         while self.control_mode != RL_CIRCULAR_CONTROL:
             self.control_mode = self.controller.control_mode()
-
-
+            
             self.controller.read(self.data.time, self.data.qpos, self.data.qvel, self.model.opt.timestep)
             self.controller.control_mujoco()
             self._torque, _ = self.controller.write()
@@ -1921,26 +1930,53 @@ class cabinet_env:
 
             if self.rendering:
                 self.render()
-        self.door_angle = self.data.qpos[self.door_joint_idx]
-        self.door_angle_pre = self.door_angle
+        self.cabinet1_angle = self.data.qpos[self.cabinet1_joint_idx]
+        self.cabinet1_angle_pre = self.cabinet1_angle
         self.start_time = self.data.time
+        
+        self.force_gain = 0
+        
         return obs
 
     def step(self, action_rotation, action_force):
-
         done = False
         duration = 0
+        # if action_force < -0.666:
+        #     action_force = -10
+        # elif action_force < -0.333:
+        #     action_force = -1
+        # elif action_force <= 0.333:
+        #     action_force = 0
+        # else:
+        #     action_force = 1
+        
+        # print(action_force)
+        
         if action_force < -0.666:
-            action_force = -10
+            action_force = -2
         elif action_force < -0.333:
             action_force = -1
         elif action_force <= 0.333:
             action_force = 0
         else:
-            action_force = 1
+            action_force = 2
+            
+        # action_force = 1
+        
+        ###########################################
+        # action_rotation = np.array([0, 0])
+        # if duration < 80:
+        #     action_force = 1
+        # else:
+        #     action_force = 0
+        
         self.force += action_force
         self.force = np.clip(self.force, 0, abs(self.force))
-        self.door_angle = self.data.qpos[self.door_joint_idx]
+        self.cabinet1_angle = self.data.qpos[self.cabinet1_joint_idx]
+        # action_force = 1
+        # print(f"{YELLOW}f/env.step action_force:   \n{RESET}", action_force)
+        # print(f"{MAGENTA}f/env.step self.force:   \n{RESET}", self.force)
+        # print(f"{RED}f/env.step time_duration: \n{RESET}", self.data.time - self.start_time)
         while not done:
             done = self._done()
             self.control_mode = self.controller.control_mode()
@@ -1972,8 +2008,16 @@ class cabinet_env:
         reward_rotation, reward_force = self._reward(action_rotation, action_force)
         info = self._info()
         self.action_rotation_pre = action_rotation
-        self.door_angle_pre = self.door_angle
-
+        self.cabinet1_angle_pre = self.cabinet1_angle
+        
+        # print(self.data.qvel[-2])
+        
+        # print(f"{RED}f/obs:                {RESET}", obs)
+        print(f"{GREEN}f/reward_rotation:    {RESET}", reward_rotation)
+        print(f"{GREEN}f/reward_force:       {RESET}", reward_force)
+        
+        self.force_gain = self.controller.get_force_gain()
+        
         return obs, reward_rotation, reward_force, done, info
 
     def _observation(self):
@@ -1987,13 +2031,13 @@ class cabinet_env:
         4. valve rotation angular velocity
         밸브 종류에 따라 개별적으로 네트워크 학습한다고 생각하고... !
         '''
-        q_unscaled = self.data.qpos[0:self.k]
+        q_unscaled = self.data.qpos[0:self.dof]
         self.obs_q = (q_unscaled - self.q_range[:, 0]) / (self.q_range[:, 1] - self.q_range[:, 0]) * (1 - (-1)) - 1
-        dq_unscaled = self.data.qvel[0:self.k]
+        dq_unscaled = self.data.qvel[0:self.dof]
         self.obs_dq = (dq_unscaled - self.qdot_range[:, 0]) / (self.qdot_range[:, 1] - self.qdot_range[:, 0]) * (1 - (-1)) - 1
 
         self.obs_ee = self.controller.relative_T_hand()
-        tau_unscaled = self.data.ctrl[0:self.k]
+        tau_unscaled = self.data.ctrl[0:(self.k + 1)]
         self.obs_tau = (tau_unscaled - self.tau_range[:, 0]) / (self.tau_range[:, 1] - self.tau_range[:, 0]) * (
                     1 - (-1)) - 1
 
@@ -2003,43 +2047,73 @@ class cabinet_env:
         self.history_observation[1:] = self.history_observation[:-1]
         self.history_observation[0] = obs
         observation = self.generate_downsampled_observation(self.history_observation)
+        
         return observation
 
     def _reward(self, action_rotation, action_force):
         reward_force = 0
-        # reward_rotation = 1
-        reward_rotation = (self.door_angle - self.door_angle_pre) * 1e3
+        reward_grasp = 0
+        reward_rotation = 2 # 오래 잡고 있으면 reward
+        reward_task = (self.cabinet1_angle - self.cabinet1_angle_pre) * 1e2 * 3
         reward_qvel = -abs(self.data.qvel[:7]).sum() * 0.25
         q_max = max(abs(self.obs_q))
+        
+        print("q_max: ", q_max)
+        print(f"self.obs_omega[0]: ", self.obs_omega[0])
         if q_max > 0.9:
             if action_force < 0:
                 reward_force += 2
+                print("AAA")
                 # reward_force += 1
         else:
-            if 0.1 <= abs(self.obs_omega[0]) <= 0.15:
-                reward_force += 1
+            if 0.3 <= self.obs_omega[0] <= 0.5: # cabinet1의 prismatic joint 속도
+                reward_force += 2
+                print("BBB")
+            elif self.obs_omega[0] > 0.5:
+                reward_force -= 10
+            elif self.obs_omega[0] < 0.3:
+                reward_force -= 4
+        
         self.contact_detection = -1 in self.contact_list
         if self.contact_detection:
             idx = np.where(np.array(self.contact_list) == -1)
             contact_force = 0.0
             for i in idx[0]:
-                contact_force += self.data.contact[i].dist
-            reward_rotation += np.log(-contact_force) * 0.1
+                contact_force += self.data.contact[i].dist # contact이 겹쳐있는 정도를 의미
+            reward_task += np.log(-contact_force) * 0.1
+            # print(f"{YELLOW}reward_task: \n{RESET}", reward_task)
+            # print(f"{MAGENTA}{self.data.geom_xpos[self.cabinet1_idx][0]-self.controller.get_ee()[1][0]}")
+            # print(self.controller.get_ee())
+            
+        # self.error_xpos = abs(self.data.geom_xpos[self.cabinet1_idx][0]-self.controller.get_ee()[1][0])
+        # if self.error_xpos <= 0.001:
+        #     reward_grasp += 1
+        #     # pass
+        # else:
+        #     reward_grasp -= 5
 
+        # if len(self.grasp_list) <= 4:
+        #     reward_grasp -= (4 - len(self.grasp_list)) * 8
+        # else:
+        #     reward_grasp += (len(self.grasp_list) - 4) * 2
+        # print(f"{BLUE}f/env.reward reward_grasp: {RESET}", reward_grasp)
+        # print(f"{BLUE}f/env.reward reward_grasp: {RESET}", reward_grasp)
+            
         # print(self.door_angle - self.door_angle_pre)
         if self.deviation_done:
-            reward_rotation -= 100
-        elif self.bound_done:
-            reward_rotation -= 100
+            # reward_task -= 100
             reward_force -= 100
+            reward_rotation -= 50
+        elif self.bound_done:
+            reward_task -= 100
+            reward_rotation -= 100
         elif self.time_done:
-            reward_rotation += 10
+            reward_task += 10
             reward_force += 10
 
         reward_acc = -sum(abs(action_rotation - self.action_rotation_pre))
-        # print(reward_rotation, ", ", reward_acc, ",  ", reward_rotation + reward_acc)
-        # print(abs(self.data.qvel[:7]).sum(), reward_rotation+reward_acc, reward_force)
-        return reward_rotation + reward_acc + reward_qvel, reward_force + reward_qvel
+        
+        return reward_rotation + reward_acc + reward_qvel + reward_grasp, reward_force + reward_qvel + reward_grasp + reward_task
 
     def _done(self):
 
@@ -2047,10 +2121,11 @@ class cabinet_env:
         self.grasp_list = tools.detect_grasp(self.data.contact, self.desired_contact_finger_bid,
                                              self.desired_contact_obj_bid)
         self.q_operation_list = tools.detect_q_operation(self.data.qpos, self.q_range)
+        # print(f"{YELLOW}f/env.done self.grasp_list: \n{RESET}", self.grasp_list)
 
         # self.contact_done = -1 in self.contact_list
         self.bound_done = -1 in self.q_operation_list
-        normalized_q = self.obs_q
+        normalized_q = self.obs_q[:self.k]
         if max(abs(normalized_q)) > 0.98:
             self.bound_done = 1
         else:
@@ -2059,12 +2134,27 @@ class cabinet_env:
         if self.control_mode != RL_CIRCULAR_CONTROL:
             self.deviation_done = False
         else:
-            if len(self.grasp_list) <= 2:
+            if len(self.grasp_list) <= 1: # 2
                 self.deviation_done = True
+                # pass
 
         self.time_done = self.data.time - self.start_time >= self.episode_time
+        
+        # print(f"{GREEN}self.time_done: {RESET}", self.time_done)
+        # print(f"{GREEN}self.bound_done: {RESET}", self.bound_done)
+        # print(f"{GREEN}self.deviation_done: {RESET}", self.deviation_done)
+        
         if self.time_done or self.bound_done or self.deviation_done:
+            print(f"{RED}DONEDONEDONEDONE{RESET}")
+            if self.bound_done:
+                print("bound done occured!")
+            elif self.deviation_done:
+                print("deviation done occured!")
+            elif self.time_done:
+                print("time done occured!")
+            print("===========================================================")
             return True
+            # return False
         else:
             return False
 
@@ -2090,11 +2180,19 @@ class cabinet_env:
 
     def _construct_observation_space(self):
 
+        # s = {
+        #     'q': spaces.Box(shape=(self.k, 1), low=-1, high=1, dtype=np.float32),
+        #     'dq': spaces.Box(shape=(self.k, 1), low=-1, high=1, dtype=np.float32),
+        #     'relative_matrix': spaces.Box(shape=(16, 1), low=-np.inf, high=np.inf, dtype=np.float_),
+        #     'tau': spaces.Box(shape=(self.k, 1), low=-1, high=1, dtype=np.float_),
+        #     'omega': spaces.Box(shape=(2, 1), low=-np.inf, high=np.inf, dtype=np.float_),
+        # }
+        
         s = {
-            'q': spaces.Box(shape=(self.k, 1), low=-1, high=1, dtype=np.float32),
-            'dq': spaces.Box(shape=(self.k, 1), low=-1, high=1, dtype=np.float32),
+            'q': spaces.Box(shape=(self.dof, 1), low=-1, high=1, dtype=np.float32),
+            'dq': spaces.Box(shape=(self.dof, 1), low=-1, high=1, dtype=np.float32),
             'relative_matrix': spaces.Box(shape=(16, 1), low=-np.inf, high=np.inf, dtype=np.float_),
-            'tau': spaces.Box(shape=(self.k, 1), low=-1, high=1, dtype=np.float_),
+            'tau': spaces.Box(shape=((self.k + 1), 1), low=-1, high=1, dtype=np.float_),
             'omega': spaces.Box(shape=(2, 1), low=-np.inf, high=np.inf, dtype=np.float_),
         }
 
@@ -2120,32 +2218,70 @@ class cabinet_env:
             self.viewer.sync()
 
     def env_information(self):
-
-        latch_parents_index = mujoco.mj_name2id(self.model, BODY, "latch")
-        door = np.ones([4,4])
-        latch = np.ones([4,4])
-
-        door[3] = np.array([0,0,0,1])
-        latch[3] = np.array([0,0,0,1])
-
-        door[0:3,3] = self.data.xpos[self.door_body_idx]
-        latch[0:3,3] = self.data.xpos[self.latch_body_idx]
-        door_quat = self.model.body_quat[self.door_body_idx]
-        latch_quat = self.model.body_quat[self.latch_body_idx]
-        door[0:3, 0:3] = R.from_quat(tools.quat2xyzw(door_quat)).as_matrix()
-
-        latch_parent = R.from_quat(tools.quat2xyzw(self.model.body_quat[latch_parents_index]))
-        latch[0:3, 0:3] = (latch_parent * R.from_quat(tools.quat2xyzw(latch_quat))).as_matrix()
-        
         # cabinet320 handle에 대한 위치 정보
-        self.cabinet1_idx = mujoco.mj_name2id(self.model, GEOM, "handle_marker1") # 128
         cabinet1 = np.ones([4,4])
         cabinet1[3] = np.array([0,0,0,1])
+        
         cabinet1[0:3,3] = self.data.geom_xpos[self.cabinet1_idx]
         cabinet1_quat = self.model.geom_quat[self.cabinet1_idx]
+        
         cabinet1[0:3, 0:3] = R.from_quat(tools.quat2xyzw(cabinet1_quat)).as_matrix()
 
-        return cabinet1.tolist(), door.tolist()
+        return cabinet1.tolist()
+    
+    # contact force
+    def get_contact_forces(self, target_geom_id):
+        contact_forces = []
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+            if contact.geom1 == target_geom_id or contact.geom2 == target_geom_id:
+                force = np.zeros(6, dtype=np.float64)  # Force vector to store the result
+                mujoco.mj_contactForce(self.model, self.data, i, force)
+                contact_normal_force = force[:3]
+                contact_friction_force = force[3:]
+                contact_point = contact.pos
+                contact_velocity = self.get_contact_velocity(contact)
+                contact_info = {
+                    'contact_point': contact_point,
+                    'normal_force': contact_normal_force,
+                    'friction_force': contact_friction_force,
+                    'contact_velocity': contact_velocity
+                }
+                contact_forces.append(contact_info)
+                print(f"Contact {i} for Geom {target_geom_id}:")
+                print(f"  Contact point: {contact_point}")
+                print(f"  Normal force: {contact_normal_force}")
+                print(f"  Friction force: {contact_friction_force}")
+                print(f"  Contact velocity: {contact_velocity}")
+        return contact_forces
+
+    def get_contact_velocity(self, contact):
+        # 접촉 지점의 속도를 계산하는 함수
+        geom1_id = contact.geom1
+        geom2_id = contact.geom2
+
+        # geom1과 geom2의 바디 ID
+        body1_id = self.model.geom_bodyid[geom1_id]
+        body2_id = self.model.geom_bodyid[geom2_id]
+
+        # geom1의 바디 속도
+        body1_vel = self.data.qvel[self.model.body_dofadr[body1_id]:self.model.body_dofadr[body1_id]+6]
+        body1_lin_vel = body1_vel[:3]
+        body1_ang_vel = body1_vel[3:6]
+
+        # geom2의 바디 속도
+        body2_vel = self.data.qvel[self.model.body_dofadr[body2_id]:self.model.body_dofadr[body2_id]+6]
+        body2_lin_vel = body2_vel[:3]
+        body2_ang_vel = body2_vel[3:6]
+
+        # 접촉 지점의 상대 속도 계산
+        contact_pos = contact.pos
+        body1_contact_point_vel = body1_lin_vel + np.cross(body1_ang_vel, contact_pos - self.data.xpos[body1_id, :3])
+        body2_contact_point_vel = body2_lin_vel + np.cross(body2_ang_vel, contact_pos - self.data.xpos[body2_id, :3])
+        rel_vel = body1_contact_point_vel - body2_contact_point_vel
+
+        return rel_vel
+
 
     def save_frame_data(self, ee):
         r = R.from_euler('xyz', ee[1][3:6], degrees=False)

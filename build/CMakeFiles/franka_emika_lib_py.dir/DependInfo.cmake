@@ -1,15 +1,22 @@
-
-# Consider dependencies only in project.
-set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
-
 # The set of languages for which implicit dependencies are needed:
 set(CMAKE_DEPENDS_LANGUAGES
+  "CXX"
+  )
+# The set of files for implicit dependencies of each language:
+set(CMAKE_DEPENDS_CHECK_CXX
+  "/home/kist/franka_cabinet/simulate/robotmodel.cpp" "/home/kist/franka_cabinet/build/CMakeFiles/franka_emika_lib_py.dir/simulate/robotmodel.cpp.o"
+  "/home/kist/franka_cabinet/simulate/trajectory.cpp" "/home/kist/franka_cabinet/build/CMakeFiles/franka_emika_lib_py.dir/simulate/trajectory.cpp.o"
+  )
+set(CMAKE_CXX_COMPILER_ID "GNU")
+
+# Preprocessor definitions for this target.
+set(CMAKE_TARGET_DEFINITIONS_CXX
+  "MJSIMULATE_STATIC"
   )
 
-# The set of dependency files which are needed:
-set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/kist-robot2/Franka/franka_cabinet/simulate/robotmodel.cpp" "CMakeFiles/franka_emika_lib_py.dir/simulate/robotmodel.cpp.o" "gcc" "CMakeFiles/franka_emika_lib_py.dir/simulate/robotmodel.cpp.o.d"
-  "/home/kist-robot2/Franka/franka_cabinet/simulate/trajectory.cpp" "CMakeFiles/franka_emika_lib_py.dir/simulate/trajectory.cpp.o" "gcc" "CMakeFiles/franka_emika_lib_py.dir/simulate/trajectory.cpp.o.d"
+# The include file search paths:
+set(CMAKE_CXX_TARGET_INCLUDE_PATH
+  "../include"
   )
 
 # Targets to which this target links.

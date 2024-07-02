@@ -57,6 +57,7 @@ public:
     void TargetRePlan_pybind();
     void TargetRePlan2_pybind(std::array<double, 7> q_goal);
     void TargetRePlan3_pybind(std::array<double, 7> q_goal);
+    double get_force_gain();
     // double TargetPlanRL_pybind(double angle);
     // tuple<double,vector<double>,vector<double>,vector<double>>TargetPlanRL_pybind(double angle);
     std::vector<double> torque_command, force_command;
@@ -69,7 +70,7 @@ public:
 	
     
     void Initialize(int planning_mode, array<array<double, 4>, 4> latch_info, array < array < double, 4 > ,4 > door_info, array<double, 2> goal_theta);
-    void Initialize_Cabinet(int planning_mode, array<array<double, 4>, 4> cabinet_info);
+    void Initialize_Cabinet(int planning_mode, array<array<double, 4>, 4> cabinet_info, double goal_theta);
     
 
 
@@ -291,7 +292,7 @@ private:
     Matrix3d _rotation_latch, _rotation_door;
     Vector3d _position_latch, _position_door;
     Objects _latch, _door, _cabinet;
-    double _goal_theta_latch, _goal_theta_door;
+    double _goal_theta_latch, _goal_theta_door, _goal_theta_cabinet;
     
     // for cabinet
     Matrix3d _rotation_cabinet;
