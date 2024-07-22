@@ -71,9 +71,10 @@
             <inertial pos="-0.308565 0 -0.0320813" quat="0 0.715298 0 0.69882" mass="9.84" diaginertia="0.504495 0.386995 0.157083" />
             <joint name="base_cabinet_c3_r2_drawer_front_panel_joint" pos="0 0 0" axis="1 0 0" type="slide" limited="true" range="0 0.542" damping="100" frictionloss="0.05" />
             <geom size="0.008 0.198 0.098" type="box" rgba="0.89 0.81 0.69 1" />
-            <!-- <geom name="cabinet320_handle" pos="0.008 0 0.048" type="mesh" rgba="0.3 0.3 0.3 1" mesh="handle" class="collision" friction="5 0.5 0.5"/> -->
+            <geom name="cabinet320_handle_viz" pos="0.008 0 0.048" type="mesh" rgba="0.3 0.3 0.3 1" mesh="handle" class="visual"/>
+            <geom name="cabinet320_handle" pos="0.008 0 0.048" type="mesh" rgba="0.3 0.3 0.3 1" mesh="handle" class="collision" friction="5 0.5 0.5"/>
             <!-- <geom name="cabinet320_valve" pos="0.008 0 0.048" type="mesh" rgba="0.3 0.3 0.3 1" mesh="valve" class="visual" friction="5 0.5 0.5"/> -->
-            <geom name="handle_marker1_visual" pos="0.038 0 0.048" quat="0.707107 0.707107 0 0.0" type="cylinder" size="0.01 0.06" class="visual" />
+            <!-- <geom name="handle_marker1_visual" pos="0.038 0 0.048" quat="0.707107 0.707107 0 0.0" type="cylinder" size="0.01 0.06" class="visual" /> -->
             <geom name="handle_marker1" pos="0.038 0 0.048" quat="0.707107 0.707107 0 0.0" type="cylinder" size="0.01 0.06" class="collision" />
             <geom name="cabinet322" pos="0.038 0 0.048" quat="0.707107 0.707107 0 0.0" type="cylinder" size="0.01 0.06" rgba="0.3 0.3 0.3 1" class="collision" />
             <!-- <geom name="cabinet322_ccollision" pos="0.038 0 0.048" quat="0.707107 0.707107 0 0.0" type="cylinder" size="0.01 0.06" rgba="0.3 0.3 0.3 1" class="visual" /> -->

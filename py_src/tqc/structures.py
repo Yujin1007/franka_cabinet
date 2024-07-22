@@ -9,6 +9,8 @@ import pickle
 # from torch_geometric.nn import GCNConv
 # from torch_geometric.data import Data
 
+import os
+
 
 from tqc import DEVICE
 
@@ -230,6 +232,7 @@ class ReplayBuffer(object):
         return {name: getattr(self, name)[:self.size] for name in self.transition_names}
 
     def save(self, file_name):
+        os.makedirs(os.path.dirname(file_name), exist_ok=True)
         with open(file_name, 'wb') as f:
             pickle.dump(self, f)
 

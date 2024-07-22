@@ -1,3 +1,4 @@
+import os
 import torch
 
 from tqc.functions import quantile_huber_loss_f
@@ -144,6 +145,10 @@ class Trainer(object):
 
 	def save(self, filename):
 		filename = str(filename)
+		os.makedirs(filename, exist_ok=True)
+		if not os.path.exists(filename):
+			os.makedirs(filename)
+
 		torch.save(self.critic.state_dict(), filename + "_critic")
 		torch.save(self.critic_target.state_dict(), filename + "_critic_target")
 		torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")

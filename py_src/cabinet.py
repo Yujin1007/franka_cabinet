@@ -35,6 +35,9 @@ import webbrowser
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
+import matplotlib.image as img
+
+
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -47,19 +50,6 @@ HEURISTIC = 0
 RL = 1
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-current_time = datetime.datetime.now().strftime("%Y%m%d_%H-%M-%S")
-writer = SummaryWriter(f"../runs/franka_cabinet/{current_time}")
-# writer.add_text("Initialization", "Writer Initialized")
-# time.sleep(5)
-# tensorboard_cmd = ['tensorboard', '--logdir', f"../runs/franka_cabinet/{current_time}"]
-# tensorboard_process = subprocess.Popen(tensorboard_cmd)
-print(f"{YELLOW}[TENSORBOARD]{RESET} The data will be saved in {YELLOW}../runs/franka_cabinet/{current_time}{RESET} directory!")
-
-
-tb = program.TensorBoard()
-tb.configure(argv=[None, '--logdir', f"../runs/franka_cabinet/{current_time}", '--port', '6010'])
-url = tb.launch()
-webbrowser.open_new(url)
 
 def main(PATH, TRAIN, OFFLINE, RENDERING):
     env = fr3Env.cabinet_env()
@@ -74,13 +64,15 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
     env.train = TRAIN
     max_timesteps = 1e6
     max_episode = 1e4
-    batch_size = 16
+    batch_size = 256
     policy_kwargs = dict(n_critics=5, n_quantiles=25)
     save_freq = 1e2
     models_dir = PATH
-    pretrained_model_dir = models_dir + "3.0/" # 6.0 : 6.4 , 5: 5.7
+    num_dir = 60.0
+    pretrained_model_dir = models_dir + str(num_dir) # 6.0 : 6.4 , 5: 5.7
     # pretrained_model_dir = models_dir + "10.0/" # 6.0 : 6.4 , 5: 5.7
     episode_data = []
+    timestep_data = []
     save_flag = False
 
     state_dim = env.observation_space.shape
@@ -127,13 +119,32 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
     episode_return_force = 0
     episode_timesteps = 0
     episode_num = 0
+    episode_return_rotation_accum = 0
+    episode_return_force_accum = 0
+    episode_cnt = 0
+    best_episode_return_rotation = -np.inf
+    best_episode_return_force = -np.inf
+    bbest_episode_return_rotation = -np.inf
+    bbest_episode_return_force = -np.inf
+    
+    continue_train = False
 
     if TRAIN:
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%H-%M-%S")
+        writer = SummaryWriter(f"../runs/franka_cabinet/{current_time}")
+        print(f"{YELLOW}[TENSORBOARD]{RESET} The data will be saved in {YELLOW}../runs/franka_cabinet/{current_time}{RESET} directory!")
+
+        tb = program.TensorBoard()
+        tb.configure(argv=[None, '--logdir', f"../runs/franka_cabinet/{current_time}", '--port', '8000'])
+        url = tb.launch()
+        webbrowser.open_new(url)
+
         state = env.reset(PLANNING_MODE)
-        pretrained_model_dir1 = pretrained_model_dir+"rotation/"
-        pretrained_model_dir2 = pretrained_model_dir+"force/"
+        pretrained_model_dir1 = pretrained_model_dir + "/rotation/"
+        pretrained_model_dir2 = pretrained_model_dir + "/force/"
         # trainer1.load(pretrained_model_dir1)
         # trainer2.load(pretrained_model_dir2)
+        # continue_train = True
 
         actor1.train()
         actor2.train()
@@ -155,7 +166,9 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
             #     action_force = 0
                 
             next_state, reward_rotation, reward_force, done, _ = env.step(action_rotation, action_force)
-            print(f"{CYAN}c/env.step-----    {RESET}")
+            # print(f"{CYAN}c/env.step-----    {RESET}")
+            # print(f"{MAGENTA}c/reward_rotation:         {RESET}", reward_rotation)
+            # print(f"{MAGENTA}c/reward_force:            {RESET}", reward_force)
 
             episode_timesteps += 1
 
@@ -173,7 +186,7 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
             force_gain_tb = torch.tensor(env.force_gain, dtype=torch.float32)
             force_gains.append(force_gain_tb.item())
             
-            print("force_gain: ", force_gain_tb)
+            # print(f"{RESET}force_gain:              {RESET}", force_gain_tb)
             
             # writer.add_scalar('Action/Rotation', episode_action_rotation, t+1)
             # writer.add_scalar('Action/Force', force_gain_tb, t+1)
@@ -186,23 +199,108 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
                     trainer2.train_with_demo(replay_buffer2, replay_buffer2_expert, batch_size)
 
                 else:
+                    if env.data.qpos[9] > 0.5:
+                        print(f"{YELLOW}cabinet angle: {RESET}", env.data.qpos[9])
+                        path1 = models_dir + "bestbestbests/rotation/"
+                        path2 = models_dir + "bestbestbests/force/"
+                        os.makedirs(path1, exist_ok=True)
+                        trainer1.save(path1)
+                        os.makedirs(path2, exist_ok=True)
+                        trainer2.save(path2)
+                        
                     trainer1.train(replay_buffer1, batch_size)
                     trainer2.train(replay_buffer2, batch_size)
             
             if done:
                 # +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
-                print(
-                    f"Total T: {t + 1} Episode Num: {episode_num + 1} Episode T: {episode_timesteps} "
-                    f"Reward R: {episode_return_rotation:.3f} Reward F: {episode_return_force:.3f}")
+                if continue_train == True:
+                    print(
+                        f"Total T: {t + 1} Episode Num: {num_dir*100 + episode_num + 1} Episode T: {episode_timesteps} "
+                        f"Reward R: {episode_return_rotation:.3f} Reward F: {episode_return_force:.3f}")
+                else:  
+                    print(
+                        f"Total T: {t + 1} Episode Num: {episode_num + 1} Episode T: {episode_timesteps} "
+                        f"Reward R: {episode_return_rotation:.3f} Reward F: {episode_return_force:.3f}")
+                
+                if env.data.qpos[9] > 0.5:
+                    print(f"{YELLOW}cabinet angle: {RESET}", env.data.qpos[9])
+                    path1 = models_dir + "bestbestbest/rotation/"
+                    path2 = models_dir + "bestbestbest/force/"
+                    os.makedirs(path1, exist_ok=True)
+                    trainer1.save(path1)
+                    os.makedirs(path2, exist_ok=True)
+                    trainer2.save(path2)
+                
+                # trainer1.train(replay_buffer1, batch_size)
+                # trainer2.train(replay_buffer2, batch_size)
+                
+                # save_manual = int(input("save policy? 0: No, 1: Yes"))
+                # if save_manual == 1:
+                #     path1 = models_dir + "manual" + "/rotation/"
+                #     path2 = models_dir + "manual" + "/force/"
+                #     os.makedirs(path1, exist_ok=True)
+                #     os.makedirs(path2, exist_ok=True)
+                #     if not os.path.exists(path1):
+                #         os.makedirs(path1)
+                #     if not os.path.exists(path2):
+                #         os.makedirs(path2)
+                #     trainer1.save(path1)
+                #     trainer2.save(path2)
+                    
+                # print(f"{YELLOW}cabinet angle: {RESET}", env.data.qpos[9])
+                
                 
                 # TensorBoard에 로깅
-                
                 writer.add_scalar('Reward/Rotation', episode_return_rotation_tb, episode_num + 1)
                 writer.add_scalar('Reward/Force', episode_return_force_tb, episode_num + 1)
 
+                # if t > save_freq and episode_return_rotation > return_rotation_max and episode_return_force > return_force_max:
+                #     return_rotation_max = episode_return_rotation
+                #     return_force_max = episode_return_force
+                #     path1 = models_dir + "best/rotation/"
+                #     path2 = models_dir + "best/force/"
+                #     trainer1.save(path1)
+                #     trainer2.save(path2)
+                
+                # Save best models
+                if episode_return_rotation > best_episode_return_rotation:
+                    best_episode_return_rotation = episode_return_rotation
+                    path1 = models_dir + "best/rotation/"
+                    os.makedirs(path1, exist_ok=True)
+                    trainer1.save(path1)
+                
+                if episode_return_force > best_episode_return_force:
+                    best_episode_return_force = episode_return_force
+                    path2 = models_dir + "best/force/"
+                    os.makedirs(path2, exist_ok=True)
+                    trainer2.save(path2)
+                    
+                if (episode_return_rotation > bbest_episode_return_rotation) & (episode_return_force > bbest_episode_return_force):
+                    bbest_episode_return_rotation = episode_return_rotation
+                    bbest_episode_return_force = episode_return_force
+                    path1 = models_dir + "bestbest/rotation/"
+                    path2 = models_dir + "bestbest/force/"
+                    os.makedirs(path1, exist_ok=True)
+                    trainer1.save(path1)
+                    os.makedirs(path2, exist_ok=True)
+                    trainer2.save(path2)
+                    
+                # if env.data.qpos[9] > 0.42:
+                #     path1 = models_dir + "bestbestbest/rotation/"
+                #     path2 = models_dir + "bestbestbest/force/"
+                #     os.makedirs(path1, exist_ok=True)
+                #     trainer1.save(path1)
+                #     os.makedirs(path2, exist_ok=True)
+                #     trainer2.save(path2)
+                    
                 # Reset environment
                 state = env.reset(PLANNING_MODE)
                 episode_data.append([episode_num, episode_timesteps, episode_return_rotation, episode_return_force])
+                
+                episode_return_rotation_accum += episode_return_rotation
+                episode_return_force_accum += episode_return_force
+                episode_cnt += 1
+                
                 episode_return_rotation = 0
                 episode_return_force = 0
                 episode_timesteps = 0
@@ -213,10 +311,22 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
             
             if (env.episode_number+ 1) % save_freq == 0:
                 save_flag = True
-                
+            
+            if (t + 1) % 10000 == 0:
+                timestep_data.append(
+                    [episode_return_rotation_accum / episode_cnt, episode_return_force_accum / episode_cnt])
+                episode_return_rotation_accum = 0
+                episode_return_force_accum = 0
+                episode_cnt = 0
+                np.save(models_dir + "avg_reward.npy", timestep_data)
+            
             if save_flag:
-                path1 = models_dir + str((env.episode_number + 1) // save_freq) + "/rotation/"
-                path2 = models_dir + str((env.episode_number + 1) // save_freq) + "/force/"
+                if continue_train == True:
+                    path1 = models_dir + str((env.episode_number + 1) // save_freq + num_dir) + "/rotation/"
+                    path2 = models_dir + str((env.episode_number + 1) // save_freq + num_dir) + "/force/"
+                else:
+                    path1 = models_dir + str((env.episode_number + 1) // save_freq) + "/rotation/"
+                    path2 = models_dir + str((env.episode_number + 1) // save_freq) + "/force/"
                 os.makedirs(path1, exist_ok=True)
                 os.makedirs(path2, exist_ok=True)
                 if not os.path.exists(path1):
@@ -227,17 +337,21 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
                 trainer2.save(path2)
 
                 np.save(models_dir + "reward.npy", episode_data)
+                # replay_buffer1.save(models_dir + 'replay_buffer_rotation.pkl')
+                # replay_buffer2.save(models_dir + 'replay_buffer_force.pkl')
                 save_flag = False
-        writer.close() # TensorBoard writer 종료
                 
+            
+        writer.close() # TensorBoard writer 종료
+        
             # if i % 100 == 99:
             #     print(f'[{epoch + 1}, {i + 1}] loss: {running_loss / 100:.3f}')
             #     writer.add_scalar('training loss', running_loss / 100, epoch * len(trainloader) + i)
             #     running_loss = 0.0
 
     else:
-        pretrained_model_dir1 = pretrained_model_dir+"rotation/"
-        pretrained_model_dir2 = pretrained_model_dir+"force/"
+        pretrained_model_dir1 = pretrained_model_dir + "/rotation/"
+        pretrained_model_dir2 = pretrained_model_dir + "/force/"
         trainer1.load(pretrained_model_dir1)
         actor1.eval()
         critic1.eval()
@@ -248,18 +362,26 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
         critic2.eval()
         actor2.training = False
 
-        # reset_agent.training = False
         num_ep = 16
         force_data = []
+        image = img.imread('ops_code.png')
+        
+        # plt2.imshow(image)
+        # plt3.imshow(image)
+        # plt4.imshow(image)
+        # plt5.imshow(image)
         # env.episode_number = 3
         # df = pd.read_csv("/home/kist-robot2/Downloads/obs_real.csv")
         # states = df.to_numpy(dtype=np.float32)
+        
         for _ in range(num_ep):
             state = env.reset(PLANNING_MODE)
             done = False
             step_cnt = 0
             episode_return_rotation = 0
             episode_return_force = 0
+            # chkpt = 1
+            manipulability_data = []
 
             while not done:
 
@@ -273,6 +395,28 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
                 state = next_state
                 episode_return_rotation += reward_rotation
                 episode_return_force += reward_force
+                
+                Jac = env.controller.get_jacobian()
+                manipulability = tools.calc_manipulability(np.array(Jac))
+                manipulability_data.append([env.data.qpos[9], manipulability])
+                
+                # plt.imshow(image)
+                
+                # if env.cabinet1_angle >= (0.1 * chkpt):
+                #     print(env.cabinet1_angle)
+                    
+                #     # if chkpt == 1:
+                #     #     plt.show()
+                #     # elif chkpt == 2:
+                #     #     plt.show()
+                #     # elif chkpt == 3:
+                #     #     plt.show()
+                #     # elif chkpt == 4:
+                #     #     plt.show()
+                #     # elif chkpt == 5:
+                #     #     plt.show()
+                    
+                #     chkpt += 1
 
             # np.save("./data/torque_hybrid.npy", env.torque_data)
             # print(
@@ -284,6 +428,8 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
                   "  goal:", env.goal_done)
             print(env.cabinet1_angle)
             print(env.obs_omega[0])
+            
+            np.save("OURS_MANIPULABILITY", manipulability_data)
 
             fig, axs = plt.subplots(3, 2, figsize=(8, 6))
             axs[0, 0].plot([sublist[0] for sublist in env.command_data])
@@ -306,10 +452,11 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
             # plt.plot(force_data,  linestyle='-', color='b')
             # # plt.title(env.friction)
             plt.show()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser(description="wo expert demo, first door training, ")
-    parser.add_argument("--path", help="data load path", default=" ./log/0702_1/")
+    parser.add_argument("--path", help="data load path", default=" ./log/new_ctrl/")
     parser.add_argument("--train", help="0->test,  1->train", type=int, default=1)
     parser.add_argument("--render", help="0->no rendering,  1->rendering", type=int, default=1)
     parser.add_argument("--offline", help="0->no offline data,  1->with offline data", type=int, default=0)

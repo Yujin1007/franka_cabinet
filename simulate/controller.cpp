@@ -64,10 +64,10 @@ void CController::read_pybind(double t, array<double, 11> q, array<double, 11> q
 		_gripper = q[_k + i];
 		_gripperdot = qdot[_k + i];
 	}
-	_q_latch = q[10];
-	_q_door = q[9];
-	_qdot_latch = qdot[10];
-	_qdot_door = qdot[9];
+	// _q_latch = q[10];
+	_q_cabinet = q[9];
+	// _qdot_latch = qdot[10];
+	_qdot_cabinet = qdot[9];
 }
 
 tuple<std::vector<double>, double> CController::write_pybind()
@@ -106,7 +106,8 @@ void CController::put_action_pybind(array<double, 2> action_rotation, double act
 	_dpitch = _dpitch + _ddpitch * _dt;
 	_roll = _roll + _droll * _dt;
 	_pitch = _pitch + _dpitch * _dt;
-	_dforce_gain = lpf(action_force * 0.1, _dforce_gain, 0.1); // -1 or 0 or 1
+	// _dforce_gain = lpf(action_force * 0.1, _dforce_gain, 0.1); // -1 or 0 or 1
+	_dforce_gain = action_force;
 }
 
 double CController::lpf(double input, double previousOutput, double alpha) {
@@ -139,6 +140,7 @@ double CController::lpf(double input, double previousOutput, double alpha) {
 // 	}
 // 	// _handle_valve(1) += 0.02;
 // }
+
 array<double, 6> CController::get_commands_pybind(){
 	array<double, 6> commands = {_droll, _dpitch, _roll, _pitch, _force_gain, _rforce_gain};
 	return commands;
@@ -311,7 +313,6 @@ void CController::control_mujoco()
 	motionPlan();
 	if (_control_mode == 1) // joint space control
 	{
-		// cout<<"111111111111111111111111111111111111111111111111111111"<<endl;
 		if (_t - _init_t < 0.1 && _bool_joint_motion == false)
 		{
 			VectorXd tmp;
@@ -342,7 +343,6 @@ void CController::control_mujoco()
 	}
 	else if (_control_mode == 2) // task space control
 	{
-		// cout<<"222222222222222222222222222222222222222222222222222222"<<endl;
 		if (_t - _init_t < 0.1 && _bool_ee_motion == false)
 		{
 			_start_time = _init_t;
@@ -407,7 +407,7 @@ void CController::control_mujoco()
 		_R_des_hand = rotation_calc(_roll, _pitch, _R_hand_ref);
 		_x_des_hand.segment<3>(3) = CustomMath::GetBodyRotationAngle(_R_des_hand);
 		_xdot_des_hand.segment<3>(3) = rotationdot_circular(_R_des_hand, _R_hand);
-		_force_gain += _dforce_gain;
+		_force_gain += _dforce_gain*0.1;
 
 		if (_force_gain < 0.0)
 		{
@@ -420,6 +420,45 @@ void CController::control_mujoco()
 		// if (_force_gain > 10){
 		// 	_force_gain = 10;
 		// }
+
+		// Manual
+		// _roll = 0.0;
+		// _pitch = 0.0;
+
+		// if (_qdot_cabinet < abs(0.2) * 1)
+		// {
+		// 	_dforce_gain = 0.1;
+		// 	_force_gain += _dforce_gain * 0.1;
+		// 	// cout << "AAA" << endl;
+		// }
+		// else if (_qdot_cabinet > abs(0.3) * 1)
+		// {
+		// 	_dforce_gain = -0.1;
+		// 	_force_gain += _dforce_gain * 0.1;
+		// 	// cout << "BBB" << endl;
+		// }
+		// else
+		// {
+		// 	_dforce_gain = 0.0;
+		// 	_force_gain += _dforce_gain * 0.1;
+		// 	// cout << "CCC" << endl;
+		// }
+		
+		// VectorXd min_q(7), max_q(7), scaled_q(7);
+		// min_q << -2.7437, -1.7837, -2.9007, -3.0421, -2.8065, 0.5445, -3.0159;
+		// max_q << 2.7437, 1.7837, 2.9007, -0.1518, 2.8065, 4.5169, 3.0159;
+		// scaled_q << ((_q - min_q).cwiseQuotient(max_q - min_q) * (1 - (-1))).array() - 1;
+		// if (scaled_q.cwiseAbs().maxCoeff() > 0.9)
+		// {
+		// 	_dforce_gain = -100;
+		// 	_force_gain += _dforce_gain * 0.1;
+		// }
+
+		// if (_force_gain < 0.0)
+		// {
+		// 	_force_gain = 0.0;
+		// }
+
 		HybridControl();
 		GripperControl();
 
@@ -438,11 +477,14 @@ void CController::control_mujoco()
 	
 	_q_pre = _q;
 	_qdot_pre = _qdot;
+	// cout<< "====================================" << endl;
+	// cout<< _qdot << endl;
 }
 
 double CController::get_force_gain()
 {
-	return _force_gain;
+	// cout<< "force_gain: " << _force_gain << endl;
+	return _dforce_gain;
 }
 
 void CController::ModelUpdate()
@@ -764,9 +806,18 @@ void CController::TargetPlan()
 	_reach_cabinet1.time = 1.0;
 	_target_plan.push_back(_reach_cabinet1);
 	
+	// RL
 	_reach_cabinet1.state = "open";
 	_reach_cabinet1.time = abs(motion_time_const * abs(_goal_theta_cabinet)) * 2;
 	_target_plan.push_back(_reach_cabinet1);
+
+	// Manual
+	// _reach_cabinet1.x = obj_above.pos[0] - 0.5;
+	// _reach_cabinet1.time = 5.0;
+	// _target_plan.push_back(_reach_cabinet1);
+
+
+
 
 
 
@@ -1065,10 +1116,9 @@ void CController::HybridControl()
 
 	else if ((target.state == "open"))
 	{
-		// cout << "HHHHHHHHHHHEEEEEEEEEEEEERRRRRRRRRRRRRRREEEEEEEEEEEEE" << endl;
 		_J_bar_hands = CustomMath::pseudoInverseQR(_J_hands);
 		_lambda = CustomMath::pseudoInverseQR((_Ruv_J * _J_hands).transpose()) * Model._A * CustomMath::pseudoInverseQR(_Ruv_J * _J_hands);
-
+		MatrixXd lambda_diagonal = _lambda.diagonal().asDiagonal();
 		VectorXd x_des_handV, x_handV, xdot_des_handV, xdot_handV;
 		Matrix3d R_des_handV, R_handV, Rdot_des_handV, Rdot_handV, skew;
 		x_des_handV.setZero(6);
@@ -1132,8 +1182,8 @@ void CController::HybridControl()
 		// cout<<_force(0)<<","<<_force(1)<<","<<sqrt(_force(0)*_force(0) + _force(1)*_force(1))<<endl;
 
 		// FORCEX = _lambda * _Rvu_J * selected_force;
-		FORCEX = _Rvu_J * _lambda * selected_force;
-
+		// FORCEX = _Rvu_J * _lambda * selected_force;
+		FORCEX = _Rvu_J * lambda_diagonal * selected_force;
 		// if (target.state != "grasp_valve" ){
 		// 	FORCEX << 0.,0.,0.,1.,1.,0.;
 		// }

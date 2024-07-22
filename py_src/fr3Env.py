@@ -1935,6 +1935,7 @@ class cabinet_env:
         self.start_time = self.data.time
         
         self.force_gain = 0
+        self.reward_force = 0
         
         return obs
 
@@ -1953,15 +1954,13 @@ class cabinet_env:
         # print(action_force)
         
         if action_force < -0.666:
-            action_force = -2
-        elif action_force < -0.333:
             action_force = -1
+        elif action_force < -0.333:
+            action_force = -0.5
         elif action_force <= 0.333:
             action_force = 0
         else:
-            action_force = 2
-            
-        # action_force = 1
+            action_force = 1
         
         ###########################################
         # action_rotation = np.array([0, 0])
@@ -1986,6 +1985,7 @@ class cabinet_env:
             if self.control_mode == RL_CIRCULAR_CONTROL:
                 ddrollpitchdot_tmp = action_rotation * self.rotation_action_space.high
                 duration += 1
+                # print(f"{MAGENTA}f/step action_force: {RESET}", action_force)
                 self.controller.put_action(ddrollpitchdot_tmp, action_force)
             if duration == 10:
                 break
@@ -2013,8 +2013,8 @@ class cabinet_env:
         # print(self.data.qvel[-2])
         
         # print(f"{RED}f/obs:                {RESET}", obs)
-        print(f"{GREEN}f/reward_rotation:    {RESET}", reward_rotation)
-        print(f"{GREEN}f/reward_force:       {RESET}", reward_force)
+        # print(f"{GREEN}f/step reward_rotation:  {RESET}", reward_rotation)
+        # print(f"{GREEN}f/step reward_force:     {RESET}", reward_force)
         
         self.force_gain = self.controller.get_force_gain()
         
@@ -2052,54 +2052,22 @@ class cabinet_env:
 
     def _reward(self, action_rotation, action_force):
         reward_force = 0
-        reward_grasp = 0
-        reward_rotation = 2 # 오래 잡고 있으면 reward
-        reward_task = (self.cabinet1_angle - self.cabinet1_angle_pre) * 1e2 * 3
+        # reward_grasp = 0
+        reward_rotation = 2
+        reward_task = self.cabinet1_angle * 1e2 + (self.cabinet1_angle - self.cabinet1_angle_pre) * 1e3
         reward_qvel = -abs(self.data.qvel[:7]).sum() * 0.25
         q_max = max(abs(self.obs_q))
         
-        print("q_max: ", q_max)
-        print(f"self.obs_omega[0]: ", self.obs_omega[0])
         if q_max > 0.9:
             if action_force < 0:
                 reward_force += 2
-                print("AAA")
-                # reward_force += 1
         else:
-            if 0.3 <= self.obs_omega[0] <= 0.5: # cabinet1의 prismatic joint 속도
-                reward_force += 2
-                print("BBB")
-            elif self.obs_omega[0] > 0.5:
+            if self.obs_omega[0] > 0.5:
                 reward_force -= 10
-            elif self.obs_omega[0] < 0.3:
-                reward_force -= 4
         
-        self.contact_detection = -1 in self.contact_list
-        if self.contact_detection:
-            idx = np.where(np.array(self.contact_list) == -1)
-            contact_force = 0.0
-            for i in idx[0]:
-                contact_force += self.data.contact[i].dist # contact이 겹쳐있는 정도를 의미
-            reward_task += np.log(-contact_force) * 0.1
-            # print(f"{YELLOW}reward_task: \n{RESET}", reward_task)
-            # print(f"{MAGENTA}{self.data.geom_xpos[self.cabinet1_idx][0]-self.controller.get_ee()[1][0]}")
-            # print(self.controller.get_ee())
+        if self.cabinet1_angle > 0.45:
+            reward_task += 10
             
-        # self.error_xpos = abs(self.data.geom_xpos[self.cabinet1_idx][0]-self.controller.get_ee()[1][0])
-        # if self.error_xpos <= 0.001:
-        #     reward_grasp += 1
-        #     # pass
-        # else:
-        #     reward_grasp -= 5
-
-        # if len(self.grasp_list) <= 4:
-        #     reward_grasp -= (4 - len(self.grasp_list)) * 8
-        # else:
-        #     reward_grasp += (len(self.grasp_list) - 4) * 2
-        # print(f"{BLUE}f/env.reward reward_grasp: {RESET}", reward_grasp)
-        # print(f"{BLUE}f/env.reward reward_grasp: {RESET}", reward_grasp)
-            
-        # print(self.door_angle - self.door_angle_pre)
         if self.deviation_done:
             # reward_task -= 100
             reward_force -= 100
@@ -2113,7 +2081,7 @@ class cabinet_env:
 
         reward_acc = -sum(abs(action_rotation - self.action_rotation_pre))
         
-        return reward_rotation + reward_acc + reward_qvel + reward_grasp, reward_force + reward_qvel + reward_grasp + reward_task
+        return reward_rotation + reward_acc + reward_qvel, reward_force + reward_qvel + reward_task
 
     def _done(self):
 
@@ -2214,6 +2182,11 @@ class cabinet_env:
     def render(self):
         if self.viewer is None:
             self.viewer = viewer.launch_passive(model=self.model, data=self.data)
+            self.viewer.cam.lookat = self.data.body('link0').subtree_com
+            self.viewer.cam.elevation = -15
+            self.viewer.cam.azimuth = 70
+            self.viewer.cam.lookat = [0.15, 0, 0.5]
+            # self.viewer.cam.distance = 3
         else:
             self.viewer.sync()
 

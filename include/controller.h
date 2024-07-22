@@ -58,6 +58,7 @@ public:
     void TargetRePlan2_pybind(std::array<double, 7> q_goal);
     void TargetRePlan3_pybind(std::array<double, 7> q_goal);
     double get_force_gain();
+
     // double TargetPlanRL_pybind(double angle);
     // tuple<double,vector<double>,vector<double>,vector<double>>TargetPlanRL_pybind(double angle);
     std::vector<double> torque_command, force_command;
@@ -288,7 +289,7 @@ private:
     double _q_valve, _qdot_valve;
 
     ////////////////
-    double _q_door, _q_latch, _qdot_door, _qdot_latch;
+    double _q_door, _q_latch, _qdot_door, _qdot_latch, _q_cabinet, _qdot_cabinet;
     Matrix3d _rotation_latch, _rotation_door;
     Vector3d _position_latch, _position_door;
     Objects _latch, _door, _cabinet;
