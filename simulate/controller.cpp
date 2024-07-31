@@ -1182,8 +1182,8 @@ void CController::HybridControl()
 		// cout<<_force(0)<<","<<_force(1)<<","<<sqrt(_force(0)*_force(0) + _force(1)*_force(1))<<endl;
 
 		// FORCEX = _lambda * _Rvu_J * selected_force;
-		// FORCEX = _Rvu_J * _lambda * selected_force;
-		FORCEX = _Rvu_J * lambda_diagonal * selected_force;
+		FORCEX = _Rvu_J * _lambda * selected_force;
+		// FORCEX = _Rvu_J * lambda_diagonal * selected_force;
 		// if (target.state != "grasp_valve" ){
 		// 	FORCEX << 0.,0.,0.,1.,1.,0.;
 		// }

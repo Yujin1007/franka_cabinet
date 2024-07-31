@@ -28,21 +28,9 @@ rbdl/addons/urdfreader/urdfreader.h
 custommath.h
 ../include/custommath.h
 
-../include/trajectory.h
-iostream
--
-eigen3/Eigen/Dense
--
-eigen3/unsupported/Eigen/MatrixFunctions
--
-custommath.h
-../include/custommath.h
-
 /home/kist/franka_cabinet/simulate/robotmodel.cpp
 robotmodel.h
 /home/kist/franka_cabinet/simulate/robotmodel.h
-
-/home/kist/franka_cabinet/simulate/trajectory.cpp
-trajectory.h
-/home/kist/franka_cabinet/simulate/trajectory.h
+filesystem
+-
 

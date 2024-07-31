@@ -1,4 +1,5 @@
 #include "robotmodel.h"
+#include <filesystem>
 #define JDOF 7
 
 CModel::CModel()
@@ -53,9 +54,13 @@ void CModel::Initialize()
 
 void CModel::load_model()
 {   
-    // RigidBodyDynamics::Addons::URDFReadFromFile("/home/kist-robot2/catkin_ws/src/franka_emika_panda/model/franka_panda/panda.urdf", &_model, false, true); // old model with hand - working well 
-	RigidBodyDynamics::Addons::URDFReadFromFile("/home/kist/franka_door/model/franka_emika_panda/fr3.urdf", &_model, false, true); //new model from ./comile 근데 확장자만 바뀌고 urdf로 변환은 안된것같은데.. 
-    cout << endl << endl << "Model Loaded for RBDL." << endl << "Total DoFs: " << _model.dof_count << endl << endl;
+    filesystem::path relative_path("../model/fr3.urdf");
+    filesystem::path absolute_path = filesystem::absolute(relative_path);
+
+    RigidBodyDynamics::Addons::URDFReadFromFile(absolute_path.string().c_str(), &_model, false, true);
+	
+	cout << endl << endl << "Model Loaded for RBDL." << endl << "Total DoFs: " << _model.dof_count << endl << endl;
+	
 	if (_model.dof_count != _k)
 	{
 		cout << "Simulation model and RBDL model mismatch!!!" << endl << endl;

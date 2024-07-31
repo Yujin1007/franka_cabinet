@@ -68,7 +68,7 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
     policy_kwargs = dict(n_critics=5, n_quantiles=25)
     save_freq = 1e2
     models_dir = PATH
-    num_dir = 60.0
+    num_dir = ""
     pretrained_model_dir = models_dir + str(num_dir) # 6.0 : 6.4 , 5: 5.7
     # pretrained_model_dir = models_dir + "10.0/" # 6.0 : 6.4 , 5: 5.7
     episode_data = []
@@ -135,7 +135,7 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
         print(f"{YELLOW}[TENSORBOARD]{RESET} The data will be saved in {YELLOW}../runs/franka_cabinet/{current_time}{RESET} directory!")
 
         tb = program.TensorBoard()
-        tb.configure(argv=[None, '--logdir', f"../runs/franka_cabinet/{current_time}", '--port', '8000'])
+        tb.configure(argv=[None, '--logdir', f"../runs/franka_cabinet/{current_time}", '--port', '7100'])
         url = tb.launch()
         webbrowser.open_new(url)
 
@@ -211,6 +211,9 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
                     trainer1.train(replay_buffer1, batch_size)
                     trainer2.train(replay_buffer2, batch_size)
             
+            if (t + 1) % save_freq == 0:
+                save_flag = True
+                
             if done:
                 # +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
                 if continue_train == True:
@@ -309,9 +312,6 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
                 force_gain_tb = 0
                 force_gains = []
             
-            if (env.episode_number+ 1) % save_freq == 0:
-                save_flag = True
-            
             if (t + 1) % 10000 == 0:
                 timestep_data.append(
                     [episode_return_rotation_accum / episode_cnt, episode_return_force_accum / episode_cnt])
@@ -364,7 +364,6 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
 
         num_ep = 16
         force_data = []
-        image = img.imread('ops_code.png')
         
         # plt2.imshow(image)
         # plt3.imshow(image)
@@ -429,7 +428,7 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
             print(env.cabinet1_angle)
             print(env.obs_omega[0])
             
-            np.save("OURS_MANIPULABILITY", manipulability_data)
+            # np.save("OURS_MANIPULABILITY", manipulability_data)
 
             fig, axs = plt.subplots(3, 2, figsize=(8, 6))
             axs[0, 0].plot([sublist[0] for sublist in env.command_data])
@@ -456,7 +455,7 @@ def main(PATH, TRAIN, OFFLINE, RENDERING):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser(description="wo expert demo, first door training, ")
-    parser.add_argument("--path", help="data load path", default=" ./log/new_ctrl/")
+    parser.add_argument("--path", help="data load path", default=" ./log/0729_rerereward1/bestbest")
     parser.add_argument("--train", help="0->test,  1->train", type=int, default=1)
     parser.add_argument("--render", help="0->no rendering,  1->rendering", type=int, default=1)
     parser.add_argument("--offline", help="0->no offline data,  1->with offline data", type=int, default=0)

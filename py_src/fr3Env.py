@@ -2054,20 +2054,20 @@ class cabinet_env:
         reward_force = 0
         # reward_grasp = 0
         reward_rotation = 2
-        reward_task = self.cabinet1_angle * 1e2 + (self.cabinet1_angle - self.cabinet1_angle_pre) * 1e3
+        reward_task = self.cabinet1_angle * 1e2
         reward_qvel = -abs(self.data.qvel[:7]).sum() * 0.25
         q_max = max(abs(self.obs_q))
-        
+
         if q_max > 0.9:
             if action_force < 0:
                 reward_force += 2
         else:
             if self.obs_omega[0] > 0.5:
-                reward_force -= 10
-        
+                reward_force -= 5
+
         if self.cabinet1_angle > 0.45:
-            reward_task += 10
-            
+            reward_task += 2
+
         if self.deviation_done:
             # reward_task -= 100
             reward_force -= 100
@@ -2080,7 +2080,7 @@ class cabinet_env:
             reward_force += 10
 
         reward_acc = -sum(abs(action_rotation - self.action_rotation_pre))
-        
+
         return reward_rotation + reward_acc + reward_qvel, reward_force + reward_qvel + reward_task
 
     def _done(self):

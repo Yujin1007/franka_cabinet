@@ -7,7 +7,7 @@ def load_npy(file_path):
     data_pd = pd.DataFrame(data_npy)
     return data_pd
 
-def preprocess_df(data, smoothing=100, end=None):
+def preprocess_df(data, smoothing=500, end=None):
     data.columns = ['Episode', 'Total_Steps', 'Reward_r', 'Reward_f']
     data['Cumulative_Steps'] = data['Total_Steps'].cumsum()
     
@@ -34,7 +34,7 @@ def preprocess_df(data, smoothing=100, end=None):
     return data
 
 
-def draw_plot(data1, data2,  reward, label1="Ours", label2="RL", figure_number=None, obj=None):
+def draw_plot(data1, data2, reward, label1="Ours", label2="RL", figure_number=None, obj=None):
     font_size=18
     if figure_number is not None:
         plt.figure(figure_number, figsize=(5, 4))
@@ -98,11 +98,13 @@ smoothing = 1000
 # draw_plot(data1,data2,"Reward_f", figure_number=1,obj="Handle")
 
 # cabinet
-file_path1="/home/kist/franka_cabinet/py_src/ ./log/0720_reward/reward.npy"
-file_path2="/home/kist/franka_cabinet/py_src/ ./log/single3/reward.npy"
+file_path1="/home/kist/franka_cabinet/py_src/ ./log/0729_rerereward1/reward.npy"
+file_path2="/home/kist/franka_cabinet/py_src/ ./log/singlerere/reward.npy"
+# file_path1="/home/kist/franka_cabinet/py_src/ ./log/0729_rerereward/reward.npy"
+# file_path2="/home/kist/franka_cabinet/py_src/ ./log/singlerere/reward.npy"
 data1 = preprocess_df(load_npy(file_path1))
 data2 = preprocess_df(load_npy(file_path2))
-draw_plot(data1,data2,"Reward_r", figure_number=0,obj="cabinet")
-draw_plot(data1,data2,"Reward_f", figure_number=1,obj="cabinet")
+draw_plot(data1,data2,"Reward_r", figure_number=0, obj="cabinet")
+draw_plot(data1,data2,"Reward_f", figure_number=1, obj="cabinet")
 
 plt.show()

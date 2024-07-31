@@ -39,7 +39,7 @@ def main(PATH, TRAIN, RENDERING):
     policy_kwargs = dict(n_critics=5, n_quantiles=25)
     save_freq = 1e2
     models_dir = PATH
-    pretrained_model_dir = models_dir + "112.0/" # 6.0 : 6.4 , 5: 5.7
+    pretrained_model_dir = models_dir + "20.0/" # 6.0 : 6.4 , 5: 5.7
     # pretrained_model_dir = models_dir + "10.0/" # 6.0 : 6.4 , 5: 5.7
     episode_data = []
     timestep_data = []
@@ -230,7 +230,7 @@ def main(PATH, TRAIN, RENDERING):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--description", help="description")
-    parser.add_argument("--path", help="data load path", default=" ./log/single3/")
+    parser.add_argument("--path", help="data load path", default=" ./log/singlererere/")
     parser.add_argument("--train", help="0->test,  1->train", type=int, default=1)
     parser.add_argument("--render", help="0->no rendering,  1->rendering", type=int, default=0)
     # parser.add_argument("--offline", help="0->no offline data,  1->with offline data", type=int, default=0)

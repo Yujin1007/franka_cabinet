@@ -40,6 +40,8 @@ file_path2="/home/kist/franka_cabinet/py_src/data/cabinet/OURS_MANIPULABILITY.np
 data1 = preprocess_df(load_npy(file_path1),end=8e5)
 data2 = preprocess_df(load_npy(file_path2),end=8e5)
 
+plt.figure(0, figsize=(5, 4))
+
 # Plot the OURS_manipulability data
 plt.plot(data2['qpos'],
          data2['Manipulability'],
